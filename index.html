@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevAI Study - Pi AI Tutor</title>
+    <!-- Pi Network Official SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <style>
+        :root {
+            --pi-purple: #593B8B;
+            --pi-gold: #F5A623;
+            --bg: #F4F5F9;
+            --card: #FFFFFF;
+            --text: #1F2937;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+        header {
+            background: var(--pi-purple);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        header h1 { font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
+        .badge { background: var(--pi-gold); color: #111; font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
+        .container { max-width: 680px; width: 100%; margin: 16px auto; padding: 0 14px; flex: 1; }
+        .card { background: var(--card); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .auth-box { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .btn {
+            background: var(--pi-purple);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-gold { background: var(--pi-gold); color: #111; }
+        .input-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: #4B5563; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+        textarea { resize: vertical; min-height: 85px; }
+        .result-box {
+            margin-top: 14px;
+            padding: 14px;
+            background: #F9FAFB;
+            border-left: 4px solid var(--pi-purple);
+            border-radius: 6px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            display: none;
+        }
+        .status-text { font-size: 0.85rem; color: #059669; font-weight: 600; }
+        footer { text-align: center; padding: 14px; font-size: 0.8rem; color: #6B7280; }
+        footer a { color: var(--pi-purple); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>DevAI Study <span class="badge">Testnet</span></h1>
+    <div id="userStatus" style="font-size: 0.85rem;">Guest Pioneer</div>
+</header>
+
+<div class="container">
+    <!-- Pi Authentication Card -->
+    <div class="card auth-box">
+        <div>
+            <strong id="welcomeText">Connect with Pi Network</strong>
+            <div style="font-size: 0.82rem; color: #6B7280;" id="authSub">Sign in to personalize your AI study sessions</div>
+        </div>
+        <button class="btn btn-gold" id="piLoginBtn" onclick="loginWithPi()">Sign in with Pi</button>
+    </div>
+
+    <!-- API Key Setup (Stored locally in browser) -->
+    <div class="card">
+        <div class="input-group" style="margin-bottom: 0;">
+            <label for="apiKeyInput">Gemini API Key (Saved locally on your device)</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API Key (AIza...)">
+                <button class="btn" onclick="saveApiKey()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Study Assistant Card -->
+    <div class="card">
+        <div class="input-group">
+            <label for="modeSelect">Study Mode</label>
+            <select id="modeSelect">
+                <option value="explain">Simple Concept Explanation</option>
+                <option value="quiz">Generate 3 Practice MCQs with Answers</option>
+                <option value="summary">Quick Revision Bullet Notes</option>
+                <option value="gujarati">Explain in Simple Gujarati (ગુજરાતીમાં સમજાવો)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="topicInput">Enter Topic or Question</label>
+            <textarea id="topicInput" placeholder="E.g., Explain Blockchain consensus, Photosynthesis, or Newton's laws..."></textarea>
+        </div>
+
+        <button class="btn" id="askBtn" style="width: 100%;" onclick="askGemini()">Ask AI Tutor</button>
+
+        <div id="resultBox" class="result-box"></div>
+    </div>
+</div>
+
+<footer>
+    Powered by Pi Network & Gemini 2.5 Flash | <a href="privacy.html">Privacy Policy</a>
+</footer>
+
+<script>
+    let currentUser = null;
+
+    // Initialize Pi SDK (sandbox: true for Testnet)
+    try {
+        Pi.init({ version: "2.0", sandbox: true });
+    } catch (e) {
+        console.log("Pi SDK init note:", e);
+    }
+
+    // Load saved Gemini API key from LocalStorage
+    window.onload = () => {
+        const savedKey = localStorage.getItem("devai_gemini_key");
+        if (savedKey) {
+            document.getElementById("apiKeyInput").value = savedKey;
+        }
+    };
+
+    function saveApiKey() {
+        const key = document.getElementById("apiKeyInput").value.trim();
+        if (!key) {
+            alert("Please enter a valid Gemini API key.");
+            return;
+        }
+        localStorage.setItem("devai_gemini_key", key);
+        alert("API Key saved locally!");
+    }
+
+    function onIncompletePaymentFound(payment) {
+        console.log("Incomplete payment found:", payment);
+    }
+
+    async function loginWithPi() {
+        const btn = document.getElementById("piLoginBtn");
+        btn.disabled = true;
+        btn.innerText = "Connecting...";
+
+        try {
+            const scopes = ['username', 'payments'];
+            const auth = await Pi.authenticate(scopes, onIncompletePaymentFound);
+            currentUser = auth.user;
+
+            document.getElementById("userStatus").innerText = "@" + currentUser.username;
+            document.getElementById("welcomeText").innerText = "Welcome, @" + currentUser.username + "!";
+            document.getElementById("authSub").innerHTML = '<span class="status-text">✓ Verified Pi Pioneer</span>';
+            btn.innerText = "Connected";
+        } catch (err) {
+            console.error(err);
+            alert("Pi Sign-In works inside Pi Browser. Error: " + (err.message || err));
+            btn.disabled = false;
+            btn.innerText = "Sign in with Pi";
+        }
+    }
+
+    async function askGemini() {
+        const apiKey = localStorage.getItem("devai_gemini_key") || document.getElementById("apiKeyInput").value.trim();
+        const topic = document.getElementById("topicInput").value.trim();
+        const mode = document.getElementById("modeSelect").value;
+        const resultBox = document.getElementById("resultBox");
+        const askBtn = document.getElementById("askBtn");
+
+        if (!apiKey) {
+            alert("Please enter and save your Gemini API Key first.");
+            return;
+        }
+        if (!topic) {
+            alert("Please enter a topic or question.");
+            return;
+        }
+
+        let promptPrefix = "";
+        if (mode === "explain") promptPrefix = "Explain the following topic clearly with practical examples for a student:\n\n";
+        if (mode === "quiz") promptPrefix = "Create 3 multiple-choice questions (MCQs) with 4 options each and provide the correct answers with brief explanations at the end for:\n\n";
+        if (mode === "summary") promptPrefix = "Provide concise, structured bullet-point revision notes for:\n\n";
+        if (mode === "gujarati") promptPrefix = "Explain the following topic clearly in simple Gujarati language:\n\n";
+
+        askBtn.disabled = true;
+        askBtn.innerText = "Thinking...";
+        resultBox.style.display = "block";
+        resultBox.innerText = "Generating AI study response...";
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: promptPrefix + topic }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+
+            const reply = data.candidates[0].content.parts[0].text;
+            resultBox.innerText = reply;
+        } catch (error) {
+            resultBox.innerText = "Error: " + error.message;
+        } finally {
+            askBtn.disabled = false;
+            askBtn.innerText = "Ask AI Tutor";
+        }
+    }
+</script>
+
+</body>
+</html>
