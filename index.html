@@ -132,17 +132,20 @@
 </div>
 
 <script>
-  const BACKEND_URL = "https://devenramanuj1.pythonanywhere.com";
+  const BACKEND_URL = "https://devai-study.onrender.com";
   let piUser = null;
   let isProUnlocked = localStorage.getItem("devai_pro_unlocked") === "true";
 
-  // Initialize Pi SDK
+  // Wake up Render free server in background & initialize Pi SDK
   window.addEventListener("load", () => {
+    fetch(BACKEND_URL).catch(() => {});
     updateProUI();
+
     if (window.Pi) {
       try {
-        window.Pi.init({ version: "2.0", sandbox: true });
-        document.getElementById("authStatus").innerText = "Pi SDK Ready (Testnet Sandbox). Tap 'Sign in with Pi'.";
+        const isSandbox = window.location.hostname.includes("sandbox");
+        window.Pi.init({ version: "2.0", sandbox: isSandbox });
+        document.getElementById("authStatus").innerText = "Pi SDK Ready. Tap 'Sign in with Pi' to connect.";
       } catch (err) {
         console.error("Pi init error:", err);
       }
